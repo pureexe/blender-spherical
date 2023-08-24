@@ -1,0 +1,8 @@
+{
+    "glb": "/home/pakkapon/mnt_tl_vision22/data/pakkapon/datasets/objaverse-randlight-1m/shoe401.glb",
+    "env": "/home/pakkapon/mnt_tl_vision22/data/pakkapon/datasets/polyhaven/images/exr/abandoned_bakery_4k.exr",
+    "env_vert": 1.9373154697137056,
+    "env_hori": 3.874630939427411,
+    "cam_vert": 1.5707963267948966,
+    "cam_hori": 0.0
+}
