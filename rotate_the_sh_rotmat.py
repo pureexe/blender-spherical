@@ -7,6 +7,7 @@ import json
 
 SH_IN_FOLDER = "assets/precompute_coeff/"
 SH_OUT_FOLDER = "sh_rotated_rotmat"
+FOR_DEBUG = True
 
 def pysh_rotate(coeffs:np.array, angle:np.array, max_degree:int = 2):
     """
@@ -51,9 +52,6 @@ def flatten_sh_coeff(sh_coeff, max_sh_level = 2):
 
 
 def main():
-    FOR_DEBUG = True
-
-    nlat, nlon = 180, 360
     
     lmax = 100 if FOR_DEBUG else 2
 
