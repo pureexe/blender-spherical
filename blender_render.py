@@ -34,63 +34,71 @@ import bpy
 from mathutils import Vector
 from argparse import Namespace
 
+IS_SCRIPTING_TAB = True #Enable this if use scripting tab to disable argparse
 
 LIMIT_ENV_VERTICAL = [-math.pi / 2, math.pi / 2]
 LIMIT_ENV_HORIZONTAL = [0, math.pi *2]
 LIMIT_CAM_VERTICAL = [-math.pi / 2, math.pi / 2]
 LIMIT_CAM_HORIZONTAL = [0, math.pi *2]
+LIMIT_OBJ_VERTICAL = [-math.pi / 2, math.pi / 2]
+LIMIT_OBJ_HORIZONTAL = [0, math.pi *2]
 
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "--object_path",
-    type=str,
-    required=True,
-    help="Path to the object file",
-)
-parser.add_argument(
-    "--envmap_path",
-    type=str,
-    required=True,
-    help="Path to the envmap file",
-)
-parser.add_argument(
-    "--name",
-    type=str,
-    required=True,
-    help="Output name",
-)
+if not IS_SCRIPTING_TAB:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--object_path",
+        type=str,
+        required=True,
+        help="Path to the object file",
+    )
+    parser.add_argument(
+        "--envmap_path",
+        type=str,
+        required=True,
+        help="Path to the envmap file",
+    )
+    parser.add_argument(
+        "--name",
+        type=str,
+        required=True,
+        help="Output name",
+    )
 
 
-parser.add_argument("--output_dir", type=str, default="./views")
-parser.add_argument("--engine", type=str, default="CYCLES", choices=["CYCLES", "BLENDER_EEVEE"])
-parser.add_argument("--num_images", type=int, default=1)
-parser.add_argument("--camera_dist", type=int, default=1.2)
-parser.add_argument("--albedo_key", type=str, default="0001")
-parser.add_argument("--env_vert", type=float, default=0.0)
-parser.add_argument("--env_hori", type=float, default=0.0)
-parser.add_argument("--cam_vert", type=float, default=math.pi / 2)
-parser.add_argument("--cam_hori", type=float, default=0.0)
+    parser.add_argument("--output_dir", type=str, default="./views")
+    parser.add_argument("--engine", type=str, default="CYCLES", choices=["CYCLES", "BLENDER_EEVEE"])
+    parser.add_argument("--num_images", type=int, default=1)
+    parser.add_argument("--camera_dist", type=int, default=1.0) #previously we use 1.2
+    parser.add_argument("--albedo_key", type=str, default="0001")
+    parser.add_argument("--env_rx", type=float, default=0.0)
+    parser.add_argument("--env_ry", type=float, default=0.0)
+    parser.add_argument("--env_rz", type=float, default=0.0)
+    parser.add_argument("--obj_rx", type=float, default=0.0)
+    parser.add_argument("--obj_ry", type=float, default=0.0)
+    parser.add_argument("--obj_rz", type=float, default=0.0)
+    parser.add_argument("--transparent_background", type=bool, default=False)
 
-argv = sys.argv[sys.argv.index("--") + 1 :]
-args = parser.parse_args(argv)
-
-"""
-args = {
-    "object_path": "C:\\Users\\pakkapon\\Desktop\\generate_objaverse\\01.glb",
-    "envmap_path": "C:\\Users\\pakkapon\\Desktop\\generate_objaverse\\env.exr",
-    "name": "test_output",
-    "output_dir": "C:\\Users\\pakkapon\\Desktop\\generate_objaverse\\output",
-    "engine": "CYCLES",
-    "num_images": 1,
-    "camera_dist": 10,
-    "env_vert": 0,
-    "env_hori": 0,
-    "cam_vert": math.pi / 2,
-    "cam_hori": math.pi / 2,
-    "albedo_key": "0001"
-}
-args = Namespace(**args)
-"""
+    argv = sys.argv[sys.argv.index("--") + 1 :]
+    args = parser.parse_args(argv)
+else:
+    args = {
+        "object_path": "C:\\Users\\pakkapon\\Desktop\\blender\\shoe401.glb",
+        "envmap_path": "C:\\Users\\pakkapon\\Desktop\\blender\\abandoned_bakery_4k.exr",
+        "name": "test_output",
+        "output_dir": "C:\\Users\\pakkapon\\Desktop\\blender\\output",
+        "engine": "CYCLES",
+        "num_images": 1,
+        "camera_dist": 1.2,
+        "env_rx": 0.0,
+        "env_ry": 0.0,
+        "env_rz": 0.0,
+        "obj_rx": 0.0,
+        "obj_ry": 0.0,
+        "obj_rz": math.pi / 4,
+        "albedo_key": "0001",
+        "transparent_background": False
+    }
+    args = Namespace(**args)
 
 context = bpy.context
 scene = context.scene
@@ -111,7 +119,7 @@ scene.cycles.transparent_max_bounces = 3
 scene.cycles.transmission_bounces = 3
 scene.cycles.filter_width = 0.01
 scene.cycles.use_denoising = True
-scene.render.film_transparent = False
+scene.render.film_transparent = args.transparent_background
 
 def enable_gpus(device_type, use_cpus=False):
     preferences = bpy.context.preferences
@@ -191,7 +199,7 @@ def scene_bbox(single_obj=None, ignore_matrix=False):
 
 def scene_root_objects():
     for obj in bpy.context.scene.objects.values():
-        if not obj.parent:
+        if not obj.parent and obj.type not in {"CAMERA"}:
             yield obj
 
 
@@ -202,6 +210,9 @@ def scene_meshes():
 
 
 def normalize_scene():
+    """
+    Normalize scene into a unit sphere
+    """
     bbox_min, bbox_max = scene_bbox()
     scale = 1 / max(bbox_max - bbox_min)
     for obj in scene_root_objects():
@@ -216,86 +227,68 @@ def normalize_scene():
 
 
 def setup_camera():
+    """ 
+    place a camera at [1,0,0] and looking to 
+    note: previously we use cam_dist = 1.2 but change to 1.0 for easier computation
+    """
     cam = scene.objects["Camera"]
-    cam.location = (0, args.camera_dist, 0)
-    #cam.data.lens = 35
-    #cam.data.sensor_width = 32
+    cam.location = (args.camera_dist, 0, 0) 
     cam.data.lens_unit = 'FOV' 
     cam.data.angle = math.atan2(0.5, args.camera_dist) * 2
-    cam_constraint = cam.constraints.new(type="TRACK_TO")
-    cam_constraint.track_axis = "TRACK_NEGATIVE_Z"
-    cam_constraint.up_axis = "UP_Y"
-    return cam, cam_constraint
+    return cam 
 
+def rotate_object(rot_x, rot_y, rot_z):
+    for obj in scene_root_objects():
+        #need to force set convetion to XYZ, spot some glb that use other convention
+        obj.rotation_mode = 'XYZ' 
+        print(obj.rotation_euler)
+        print("shited Y by", rot_y)
+        obj.rotation_euler.x += rot_x
+        obj.rotation_euler.y += rot_y
+        obj.rotation_euler.z += rot_z
+        print("<== ROTATED OBJECT")
+        print(obj.rotation_euler)
 
+def add_environment(envmap_path, rot_x, rot_y, rot_z):
+    """
+    Add an environment map to shader node
+    For shader node map, see https://i.imgur.com/sBlUXrB.png
+    
+    @params
+        - ennvmap_path: Path of environment map (exr file)
+        - rot_x: Rotation in X (Radiant)
+        - rot_y: Rotation in Y (Radiant)
+        - rot_z: Rotation in Z (Radiant)
 
-def add_environment(vert_deg, hori_deg):
+    NOTE:
+        Blender Roataion Convention (Euler XYZ)
+        Rx+: Clockwise
+        Ry+: looking up
+        Rz+: turn left
+    """
     nodes = bpy.data.worlds[0].node_tree.nodes
     links = bpy.data.worlds[0].node_tree.links
     node_color = nodes[1]
 
     node_env = nodes.new('ShaderNodeTexEnvironment')
-    node_env.image = bpy.data.images.load(args.envmap_path)
+    node_env.image = bpy.data.images.load(envmap_path)
 
     node_mapping = nodes.new('ShaderNodeMapping')
-    node_mapping.inputs['Rotation'].default_value.y = vert_deg # vertical
-    node_mapping.inputs['Rotation'].default_value.z = hori_deg #horizontal 
+    node_mapping.inputs['Rotation'].default_value.x = rot_x
+    node_mapping.inputs['Rotation'].default_value.y = rot_y # vertical
+    node_mapping.inputs['Rotation'].default_value.z = rot_z #horizontal 
 
     node_coord = nodes.new('ShaderNodeTexCoord')
     links.new(node_mapping.outputs["Vector"], node_env.inputs["Vector"])
     links.new(node_env.outputs["Color"], node_color.inputs["Color"])
     links.new(node_coord.outputs["Generated"], node_mapping.inputs["Vector"])
-
-def prepare_albedo():
-    for material in bpy.data.materials:
-        nodes = material.node_tree.nodes
-        links = material.node_tree.links
-        output_node = nodes['Material Output']
-        bsdf_node = output_node.inputs['Surface'].links[0].from_node
-        color_node = None
-        bsdf_target_key = 'Base Color' if 'Base Color' in bsdf_node.inputs else 'Color'
-        if len(bsdf_node.inputs[bsdf_target_key].links) > 0:
-            bsdf_prev = bsdf_node.inputs[bsdf_target_key].links[0]
-            color_node = bsdf_prev.from_node
-            color_socket = bsdf_prev.from_socket.name
-        else:
-            # in case no node, we create new node
-            color_node = nodes.new('ShaderNodeRGB')
-            color_node.outputs['Color'].default_value = bsdf_node.inputs[bsdf_target_key].default_value
-            color_socket = "Color"
-
-        emit_node = nodes.new('ShaderNodeEmission')
-        links.new(color_node.outputs[color_socket], emit_node.inputs["Color"])
-        links.new(emit_node.outputs["Emission"], output_node.inputs["Surface"])
-
-    bpy.context.scene.view_settings.view_transform = 'Standard'
-
     
 def random_params():
     env_vert =  (LIMIT_ENV_VERTICAL[0] + (LIMIT_ENV_HORIZONTAL[1] - LIMIT_ENV_HORIZONTAL[0]) * random.random())
     env_hori =  (LIMIT_ENV_HORIZONTAL[0] + (LIMIT_ENV_HORIZONTAL[1] - LIMIT_ENV_HORIZONTAL[0]) * random.random())
     cam_vert =  (LIMIT_CAM_VERTICAL[0] + (LIMIT_CAM_VERTICAL[1] - LIMIT_CAM_VERTICAL[0]) * random.random())
     cam_hori =  (LIMIT_CAM_HORIZONTAL[0] + (LIMIT_CAM_HORIZONTAL[1] - LIMIT_CAM_HORIZONTAL[0]) * random.random())
-    #env_vert, env_hori, cam_vert, cam_hori = 0.0, 0.0, math.pi/2, 0.0
     return env_vert, env_hori, cam_vert, cam_hori
-
-def set_camera(cam_vert, cam_hori):
-    cam, cam_constraint = setup_camera()
-    # create an empty object to track
-    empty = bpy.data.objects.new("Empty", None)
-    empty.location.x = 0
-    empty.location.y = 0
-    empty.location.z = 0
-    scene.collection.objects.link(empty)
-    cam_constraint.target = empty
-    theta = cam_hori
-    phi = cam_vert
-    point = (
-        args.camera_dist * math.sin(phi) * math.cos(theta),
-        args.camera_dist * math.sin(phi) * math.sin(theta),
-        args.camera_dist * math.cos(phi),
-    )
-    cam.location = point
 
 def save_image(rgb_dir, albedo_dir, name):
     # render image path
@@ -307,8 +300,10 @@ def save_image(rgb_dir, albedo_dir, name):
     bpy.ops.render.render(write_still=True)
     os.rename(os.path.join(albedo_dir, f"{name}_{args.albedo_key}.png"), os.path.join(albedo_dir, f"{name}.png"))
 
-def add_custom_composite():
-    # add custom composite node for rendering the albedo
+def add_albedo_rendering():
+    """
+    Add albedo composite node for rendering the albedo
+    """
     bpy.context.scene.use_nodes = True
     bpy.context.view_layer.use_pass_diffuse_color = True
     tree = bpy.context.scene.node_tree
@@ -335,27 +330,27 @@ def main():
     os.makedirs(albedo_dir,exist_ok=True)
     os.makedirs(json_dir,exist_ok=True)
 
-    #env_vert, env_hori, cam_vert, cam_hori = random_params()
-    env_vert, env_hori, cam_vert, cam_hori = args.env_vert, args.env_hori, args.cam_vert, args.cam_hori
     reset_scene()
     load_object(args.object_path)
     normalize_scene()
-    set_camera(cam_vert, cam_hori)
-    add_environment(env_vert, env_hori)
-    add_custom_composite()
+    rotate_object(args.obj_rx, args.obj_ry, args.obj_rz)
+    setup_camera()
+    add_environment(args.envmap_path, args.env_rx, args.env_ry, args.env_rz)
+    add_albedo_rendering()
     save_image(rgb_dir, albedo_dir, args.name)
     with open(os.path.join(json_dir, f"{args.name}.json"), "w") as f:
         data = {
             "glb": args.object_path,
             "env": args.envmap_path,
-            "env_vert": env_vert,
-            "env_hori": env_hori,
-            "cam_vert": cam_vert,
-            "cam_hori": cam_hori
+            "env_rx": args.env_rx,
+            "env_ry": args.env_ry,
+            "env_rz": args.env_rz,
+            "obj_rx": args.obj_rx,
+            "obj_ry": args.obj_ry,
+            "obj_rz": args.obj_rz
         }
         json.dump(data,f,indent = 4)
 
-if __name__ == "__main__":
+if __name__ == "__main__" or IS_SCRIPTING_TAB:
     main()
 
-#main()
