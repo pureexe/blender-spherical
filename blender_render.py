@@ -76,8 +76,8 @@ if not IS_SCRIPTING_TAB:
     parser.add_argument("--obj_rx", type=float, default=0.0)
     parser.add_argument("--obj_ry", type=float, default=0.0)
     parser.add_argument("--obj_rz", type=float, default=0.0)
-    parser.add_argument("--transparent_background", type=bool, default=False)
-
+    parser.add_argument('--transparent_background', action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument('--negative_cam', action=argparse.BooleanOptionalAction, default=False)
     argv = sys.argv[sys.argv.index("--") + 1 :]
     args = parser.parse_args(argv)
 else:
@@ -96,7 +96,8 @@ else:
         "obj_ry": 0.0,
         "obj_rz": math.pi / 4,
         "albedo_key": "0001",
-        "transparent_background": False
+        "transparent_background": False,
+        "negative_cam": True
     }
     args = Namespace(**args)
 
@@ -226,18 +227,26 @@ def normalize_scene():
     bpy.ops.object.select_all(action="DESELECT")
 
 
-def setup_camera():
+def setup_camera(use_negative_cam=True):
     """ 
     place a camera at [-1,0,0] and looking to 
     note: previously we use cam_dist = 1.2 but change to 1.0 for easier computation
     """
     cam = scene.objects["Camera"]
-    cam.location = (-args.camera_dist, 0, 0) 
-    # since camera is negative we need to flip the camera rotation from (90d, 0, 90d) to (90d, 0, -90d) (ROTATE ACROSS Z-up axis)
-    cam.rotation_mode = 'XYZ'
-    cam.rotation_euler.x = math.pi / 2
-    cam.rotation_euler.y = 0
-    cam.rotation_euler.z = -math.pi / 2
+    if use_negative_cam:
+        cam.location = (-args.camera_dist, 0, 0) 
+        # since camera is negative we need to flip the camera rotation from (90d, 0, 90d) to (90d, 0, -90d) (ROTATE ACROSS Z-up axis)
+        cam.rotation_mode = 'XYZ'
+        cam.rotation_euler.x = math.pi / 2
+        cam.rotation_euler.y = 0
+        cam.rotation_euler.z = -math.pi / 2
+    else:
+        cam.location = (args.camera_dist, 0, 0) 
+        cam.rotation_mode = 'XYZ'
+        cam.rotation_euler.x = math.pi / 2
+        cam.rotation_euler.y = 0
+        cam.rotation_euler.z = math.pi / 2
+    
     cam.data.lens_unit = 'FOV' 
     cam.data.angle = math.atan2(0.5, args.camera_dist) * 2
     return cam 
@@ -246,13 +255,9 @@ def rotate_object(rot_x, rot_y, rot_z):
     for obj in scene_root_objects():
         #need to force set convetion to XYZ, spot some glb that use other convention
         obj.rotation_mode = 'XYZ' 
-        print(obj.rotation_euler)
-        print("shited Y by", rot_y)
         obj.rotation_euler.x += rot_x
         obj.rotation_euler.y += rot_y
         obj.rotation_euler.z += rot_z
-        print("<== ROTATED OBJECT")
-        print(obj.rotation_euler)
 
 def add_environment(envmap_path, rot_x, rot_y, rot_z):
     """
@@ -266,9 +271,13 @@ def add_environment(envmap_path, rot_x, rot_y, rot_z):
         - rot_z: Rotation in Z (Radiant)
 
     NOTE:
-        Blender Roataion Convention (Euler XYZ)
+        Blender Roataion Convention (Euler XYZ, camera at z+ look to z-)
         Rx+: Clockwise
         Ry+: looking up
+        Rz+: turn left
+        However, since our camera at (-1, 0, 0)
+        Rx+: Anti-Clockwise
+        Ry+: looking down
         Rz+: turn left
     """
     nodes = bpy.data.worlds[0].node_tree.nodes
@@ -339,7 +348,7 @@ def main():
     load_object(args.object_path)
     normalize_scene()
     rotate_object(args.obj_rx, args.obj_ry, args.obj_rz)
-    setup_camera()
+    setup_camera(args.negative_cam)
     add_environment(args.envmap_path, args.env_rx, args.env_ry, args.env_rz)
     add_albedo_rendering()
     save_image(rgb_dir, albedo_dir, args.name)
