@@ -34,7 +34,7 @@ import bpy
 from mathutils import Vector
 from argparse import Namespace
 
-IS_SCRIPTING_TAB = True #Enable this if use scripting tab to disable argparse
+IS_SCRIPTING_TAB = False #Enable this if use scripting tab to disable argparse
 
 LIMIT_ENV_VERTICAL = [-math.pi / 2, math.pi / 2]
 LIMIT_ENV_HORIZONTAL = [0, math.pi *2]
@@ -88,7 +88,7 @@ else:
         "output_dir": "C:\\Users\\pakkapon\\Desktop\\blender\\output",
         "engine": "CYCLES",
         "num_images": 1,
-        "camera_dist": 1.2,
+        "camera_dist": 1.0,
         "env_rx": 0.0,
         "env_ry": 0.0,
         "env_rz": 0.0,
@@ -228,11 +228,16 @@ def normalize_scene():
 
 def setup_camera():
     """ 
-    place a camera at [1,0,0] and looking to 
+    place a camera at [-1,0,0] and looking to 
     note: previously we use cam_dist = 1.2 but change to 1.0 for easier computation
     """
     cam = scene.objects["Camera"]
-    cam.location = (args.camera_dist, 0, 0) 
+    cam.location = (-args.camera_dist, 0, 0) 
+    # since camera is negative we need to flip the camera rotation from (90d, 0, 90d) to (90d, 0, -90d) (ROTATE ACROSS Z-up axis)
+    cam.rotation_mode = 'XYZ'
+    cam.rotation_euler.x = math.pi / 2
+    cam.rotation_euler.y = 0
+    cam.rotation_euler.z = -math.pi / 2
     cam.data.lens_unit = 'FOV' 
     cam.data.angle = math.atan2(0.5, args.camera_dist) * 2
     return cam 
