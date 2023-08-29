@@ -76,7 +76,7 @@ if not IS_SCRIPTING_TAB:
     parser.add_argument("--obj_rx", type=float, default=0.0)
     parser.add_argument("--obj_ry", type=float, default=0.0)
     parser.add_argument("--obj_rz", type=float, default=0.0)
-    parser.add_argument('--transparent_background', action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument('--has_background', action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument('--negative_cam', action=argparse.BooleanOptionalAction, default=False)
     argv = sys.argv[sys.argv.index("--") + 1 :]
     args = parser.parse_args(argv)
@@ -96,7 +96,7 @@ else:
         "obj_ry": 0.0,
         "obj_rz": math.pi / 4,
         "albedo_key": "0001",
-        "transparent_background": False,
+        "has_background": False,
         "negative_cam": True
     }
     args = Namespace(**args)
@@ -120,7 +120,7 @@ scene.cycles.transparent_max_bounces = 3
 scene.cycles.transmission_bounces = 3
 scene.cycles.filter_width = 0.01
 scene.cycles.use_denoising = True
-scene.render.film_transparent = args.transparent_background
+scene.render.film_transparent = not args.has_background
 
 def enable_gpus(device_type, use_cpus=False):
     preferences = bpy.context.preferences
