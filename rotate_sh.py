@@ -24,7 +24,7 @@ def pysh_rotate(coeffs:np.array, angle:np.array, max_degree:int = 2):
     dj_mat = pysh.rotate.djpi2(max_degree)
     coeffs_rotated = []
     for c in range(coeffs.shape[0]):
-        rotated = pysh.rotate.SHRotateRealCoef(coeffs[c],angle,dj_mat)
+        rotated = pysh.rotate.SHRotateRealCoef(coeffs[c,:,:max_degree+1,:max_degree+1],angle,dj_mat)
         coeffs_rotated.append(rotated[None])
     coeffs_rotated = np.concatenate(coeffs_rotated,axis=0)
     return coeffs_rotated
@@ -53,16 +53,20 @@ def flatten_sh_coeff(sh_coeff, max_sh_level = 2):
     flatten spherical harmonics coefficient to 3xC matrix
     """
     flatted_coeff = np.zeros((3, (max_sh_level+1) ** 2))
+    # we will put into array in the format of 
+    # [0_0, 1_-1, 1_0, 1_1, 2_-2, 2_-1, 2_0, 2_1, 2_2]
+    # where first number is the order and the second number is the position in order
     for i in range(3):
         c = 0
         for j in range(max_sh_level+1):
-            for k in range(j+1):
-                flatted_coeff[i, c] = sh_coeff[i, 0, j, k]
-                c += 1
-        for j in range(1, max_sh_level+1):
-            for k in range(1, j+1):
+            for k in range(j, 0, -1):
+                print("JK ", j, ":", k)
                 flatted_coeff[i, c] = sh_coeff[i, 1, j, k]
                 c +=1
+            for k in range(j+1):
+                print("JK ", j, ":", k)
+                flatted_coeff[i, c] = sh_coeff[i, 0, j, k]
+                c += 1
     return flatted_coeff
 
 
@@ -79,14 +83,8 @@ def main():
             data = json.load(f)
             envname = data['env'].split("/")[-1][:-7]
 
-            #r_rot = R.from_euler('xyz', [data['env_rx'], data['env_ry'], data['env_rz']])
             r_rot = R.from_euler('xyz', [data['env_rx'], data['env_ry'], data['env_rz']])
             
-            #convert from blender to OPENGL convention
-            # note: THIS IS NOT PERMUTATION we got this from blender's axis_conversion(to_forward="-Z", to_up="Y")
-            # Some confirmation: https://stackoverflow.com/a/27887433
-            #r_rot = R.from_euler('xyz', [data['env_rx'], data['env_rz'], -data['env_ry']])
-
             main_sh = np.load(os.path.join(SH_IN_FOLDER, envname+".npy"))
             new_sh = rotate_sh(main_sh.copy(), r_rot, lmax, invert_transform=True)
             
