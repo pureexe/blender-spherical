@@ -60,11 +60,9 @@ def flatten_sh_coeff(sh_coeff, max_sh_level = 2):
         c = 0
         for j in range(max_sh_level+1):
             for k in range(j, 0, -1):
-                print("JK ", j, ":", k)
                 flatted_coeff[i, c] = sh_coeff[i, 1, j, k]
                 c +=1
             for k in range(j+1):
-                print("JK ", j, ":", k)
                 flatted_coeff[i, c] = sh_coeff[i, 0, j, k]
                 c += 1
     return flatted_coeff
